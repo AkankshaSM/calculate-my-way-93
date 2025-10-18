@@ -62,7 +62,7 @@ const FoodRecommendation = () => {
           <div className="flex items-center justify-center gap-2 mb-4">
             <ChefHat className="w-12 h-12 text-primary" />
             <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-              Recipe Finder
+              Recipe Finder!
             </h1>
           </div>
           <p className="text-muted-foreground text-lg">
