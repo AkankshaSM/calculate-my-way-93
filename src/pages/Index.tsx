@@ -1,10 +1,8 @@
-import Calculator from "@/components/Calculator";
+import FoodRecommendation from "@/components/FoodRecommendation";
 
 const Index = () => {
   return (
-    <main className="min-h-screen">
-      <Calculator />
-    </main>
+    <FoodRecommendation />
   );
 };
 
