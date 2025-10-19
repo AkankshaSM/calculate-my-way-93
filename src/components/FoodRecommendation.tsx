@@ -12,7 +12,8 @@ import RecipeDisplay from "./RecipeDisplay";
 const FoodRecommendation = () => {
   const [ingredients, setIngredients] = useState("");
   const [preferences, setPreferences] = useState("");
-  const [recipe, setRecipe] = useState("");
+  const [recipe, setRecipe] = useState<any>(null);
+  const [dishImage, setDishImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -29,7 +30,8 @@ const FoodRecommendation = () => {
     }
 
     setIsLoading(true);
-    setRecipe("");
+    setRecipe(null);
+    setDishImage(null);
 
     try {
       const { data, error } = await supabase.functions.invoke('get-recipe', {
@@ -39,6 +41,7 @@ const FoodRecommendation = () => {
       if (error) throw error;
 
       setRecipe(data.recipe);
+      setDishImage(data.dishImage || null);
       toast({
         title: "Recipe generated!",
         description: "Enjoy your cooking adventure",
@@ -120,7 +123,7 @@ const FoodRecommendation = () => {
             </CardContent>
           </Card>
 
-          {recipe && <RecipeDisplay recipe={recipe} />}
+          {recipe && <RecipeDisplay recipe={recipe} dishImage={dishImage || undefined} />}
         </div>
       </div>
     </div>

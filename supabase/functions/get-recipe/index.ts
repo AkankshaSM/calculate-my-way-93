@@ -17,26 +17,32 @@ serve(async (req) => {
     const { ingredients, preferences } = await req.json();
     console.log('Received request:', { ingredients, preferences });
 
-    const systemPrompt = `You are a professional chef and food historian. When given a list of ingredients and taste preferences, suggest a delicious recipe.
+    const systemPrompt = `You are a professional chef. Generate a recipe from provided ingredients.
 
-Format your response EXACTLY as follows:
-DISH_NAME: [Name of the dish]
-COOK_TIME: [e.g., 30 minutes]
-INGREDIENTS:
-- [ingredient 1 with quantity]
-- [ingredient 2 with quantity]
-- [continue list]
+CRITICAL: Return ONLY valid JSON, no markdown, no explanations. Use this exact structure:
+{
+  "title": "dish name",
+  "summary": "1-2 sentence flavor description",
+  "selected_ingredients": [{"name":"...", "qty":"...", "unit":"...", "role":"primary|supporting|aromatic|acid|fat|seasoning"}],
+  "leftover_ingredients": ["..."],
+  "extras_to_buy": ["..."],
+  "equipment": ["..."],
+  "steps": [{"n":1, "do":"...", "why":"...", "time":"~X min"}],
+  "timing": {"prep_min": 10, "cook_min": 20, "total_min": 30},
+  "servings": 2,
+  "nutrition_estimate": {"kcal_per_serving": "~500", "protein_g":"~25", "carbs_g":"~40", "fat_g":"~15"},
+  "subs_and_variations": ["..."],
+  "image_prompt": "detailed visual description for image generation, no text overlay",
+  "notes": ["safety tips, storage, etc"]
+}
 
-METHOD:
-1. [First step]
-2. [Second step]
-3. [Continue steps]
+Rules:
+- Select subset of ingredients that work well together
+- Add max 3 common staples (salt, oil, pepper, water) if essential
+- List unused ingredients in leftover_ingredients
+- Be realistic with timing and nutrition estimates`;
 
-FUN_FACT: [One interesting historical fact or cultural note about the dish]
-
-IMAGE_PROMPT: [A detailed description for generating an image of the final dish, describing colors, plating, garnishes]`;
-
-    const userPrompt = `I have these ingredients: ${ingredients}${preferences ? `\n\nMy taste preferences: ${preferences}` : ''}\n\nPlease suggest a recipe I can make.`;
+    const userPrompt = `Ingredients: ${ingredients}${preferences ? `\nPreferences: ${preferences}` : ''}`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -50,7 +56,7 @@ IMAGE_PROMPT: [A detailed description for generating an image of the final dish,
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
         ],
-        max_tokens: 1000,
+        max_tokens: 2000,
       }),
     });
 
@@ -76,16 +82,58 @@ IMAGE_PROMPT: [A detailed description for generating an image of the final dish,
     }
 
     const data = await response.json();
-    const recipeText = data.choices[0].message.content;
-    console.log('Generated recipe:', recipeText);
+    let recipeText = data.choices[0].message.content;
+    console.log('Generated recipe text:', recipeText);
 
-    return new Response(JSON.stringify({ recipe: recipeText }), {
+    // Clean markdown artifacts
+    recipeText = recipeText.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    const recipeData = JSON.parse(recipeText);
+
+    // Generate dish image
+    let dishImage = null;
+    try {
+      const imageResponse = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash-image-preview',
+          messages: [
+            { role: 'user', content: recipeData.image_prompt || `A beautifully plated ${recipeData.title}, professional food photography, natural lighting, no text overlay` }
+          ],
+          modalities: ['image', 'text']
+        }),
+      });
+
+      if (imageResponse.ok) {
+        const imageData = await imageResponse.json();
+        dishImage = imageData.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+        console.log('Image generated successfully');
+      }
+    } catch (imageError) {
+      console.error('Image generation failed:', imageError);
+    }
+
+    return new Response(JSON.stringify({ 
+      recipe: recipeData,
+      dishImage,
+      status: 'ok'
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     console.error('Error in get-recipe function:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return new Response(JSON.stringify({ error: errorMessage }), {
+    return new Response(JSON.stringify({ 
+      error: errorMessage,
+      diag: {
+        where: 'text-llm',
+        hint: 'Check ingredient format and try again'
+      }
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
