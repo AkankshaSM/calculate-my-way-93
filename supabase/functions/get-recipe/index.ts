@@ -45,7 +45,7 @@ IMAGE_PROMPT: [A detailed description for generating an image of the final dish,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini-2025-08-07',
+        model: 'gpt-3.5-turbo-0301',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }
